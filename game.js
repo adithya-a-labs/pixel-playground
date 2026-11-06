@@ -7,7 +7,9 @@ const THEME = {
 // RULES: Speeds are in Canvas pixels per second.
 const RULES = {
   playerSpeed: 270, hazardSpeed: 115, speedPerLevel: 22,
-  maxHazardSpeed: 235, pointsPerLevel: 5, maxHazards: 8
+  maxHazardSpeed: 235, pointsPerLevel: 5,
+  initialHazards: 4, maxHazards: 12, hazardSpawnSeconds: 3,
+  bulletSpeed: 540, gunLockSeconds: 5, killsPerLock: 2
 };
 
 const canvas = document.querySelector("#arena");
@@ -17,6 +19,7 @@ const overlay = document.querySelector("#overlay");
 const action = document.querySelector("#action");
 const scoreLabel = document.querySelector("#score");
 const levelLabel = document.querySelector("#level");
+const gunLabel = document.querySelector("#gun");
 const bestLabel = document.querySelector("#best");
 const panelDetail = document.querySelector("#panel-detail");
 const panelTitle = document.querySelector("#panel-title");
@@ -28,6 +31,8 @@ const storageKey = "pixel-playground-best";
 
 let state = "ready";
 let player, collectible, hazards, score, level;
+let bullets, aimAngle, gunLock, killStreak, spawnTimer;
+let pointer;
 let best = 0;
 let lastTime;
 
@@ -40,11 +45,15 @@ try {
 function resetRound() {
   player = { x: width / 2, y: height / 2, size: 26 };
   hazards = [];
+  bullets = [];
+  aimAngle = 0;
+  gunLock = 0;
+  killStreak = 0;
+  spawnTimer = 0;
   collectible = undefined;
   score = 0;
   level = 1;
-  addHazard();
-  addHazard();
+  for (let i = 0; i < RULES.initialHazards; i++) addHazard();
   placeCollectible();
   updateHud();
 }
@@ -53,6 +62,12 @@ function updateHud() {
   scoreLabel.textContent = score;
   levelLabel.textContent = level;
   bestLabel.textContent = best;
+  updateGunHud();
+}
+
+function updateGunHud() {
+  const label = gunLock > 0 ? `${Math.ceil(gunLock)}s` : "Ready";
+  if (gunLabel.textContent !== label) gunLabel.textContent = label;
 }
 
 function startRound() {
@@ -134,15 +149,63 @@ function moveHazards(dt) {
   }
 }
 
-function update(dt) {
+function updateAim() {
+  if (!pointer) return;
+  const bounds = canvas.getBoundingClientRect();
+  const x = (pointer.x - bounds.left) * width / bounds.width;
+  const y = (pointer.y - bounds.top) * height / bounds.height;
+  aimAngle = Math.atan2(y - player.y, x - player.x);
+}
+
+function fire(event) {
+  if (event.button !== 0 || event.pointerType === "touch" ||
+      state !== "playing" || gunLock > 0) return;
+  pointer = { x: event.clientX, y: event.clientY };
+  updateAim();
+  const dx = Math.cos(aimAngle);
+  const dy = Math.sin(aimAngle);
+  bullets.push({ x: player.x, y: player.y, size: 6, dx, dy });
+}
+
+function moveBullets(dt) {
+  bullets = bullets.filter(bullet => {
+    bullet.x += bullet.dx * RULES.bulletSpeed * dt;
+    bullet.y += bullet.dy * RULES.bulletSpeed * dt;
+    const target = hazards.findIndex(hazard => overlaps(bullet, hazard));
+    if (target !== -1) {
+      hazards.splice(target, 1);
+      killStreak += 1;
+      if (killStreak >= RULES.killsPerLock) {
+        gunLock = RULES.gunLockSeconds;
+        killStreak = 0;
+      }
+      return false;
+    }
+    const inside = bullet.x >= 0 && bullet.x <= width && bullet.y >= 0 && bullet.y <= height;
+    if (!inside) killStreak = 0;
+    return inside;
+  });
+}
+
+function update(dt, elapsed) {
+  gunLock = Math.max(0, gunLock - elapsed);
   movePlayer(dt);
+  updateAim();
   moveHazards(dt);
+  moveBullets(dt);
+  updateGunHud();
+  spawnTimer += elapsed;
+  if (spawnTimer >= RULES.hazardSpawnSeconds) {
+    spawnTimer %= RULES.hazardSpawnSeconds;
+    if (hazards.length < RULES.maxHazards) addHazard();
+  }
   if (hazards.some(hazard => overlaps(player, hazard))) {
     endRound();
     return;
   }
   if (collectible && overlaps(player, collectible)) {
     score += 1;
+    gunLock = RULES.gunLockSeconds;
     if (score > best) {
       best = score;
       try {
@@ -153,7 +216,6 @@ function update(dt) {
     }
     if (score % RULES.pointsPerLevel === 0) {
       level += 1;
-      if (hazards.length < RULES.maxHazards) addHazard();
     }
     placeCollectible();
     updateHud();
@@ -188,17 +250,24 @@ function draw() {
     ctx.textBaseline = "middle";
     ctx.fillText("×", hazard.x, hazard.y + 1);
   }
+  for (const bullet of bullets) drawSquare(bullet, THEME.player);
   drawSquare(player, THEME.player);
   ctx.fillStyle = THEME.background;
   ctx.fillRect(player.x - 7, player.y - 4, 4, 5);
   ctx.fillRect(player.x + 3, player.y - 4, 4, 5);
+  ctx.save();
+  ctx.translate(player.x, player.y);
+  ctx.rotate(aimAngle);
+  ctx.fillStyle = gunLock > 0 ? THEME.hazard : THEME.player;
+  ctx.fillRect(10, -3, 14, 6);
+  ctx.restore();
 }
 
 function frame(time) {
   // Cap the step after interruptions to avoid jumping across the arena.
-  const dt = lastTime === undefined ? 0 : Math.min((time - lastTime) / 1000, 0.033);
+  const elapsed = lastTime === undefined ? 0 : (time - lastTime) / 1000;
   lastTime = time;
-  if (state === "playing" && !document.hidden) update(dt);
+  if (state === "playing" && !document.hidden) update(Math.min(elapsed, 0.033), elapsed);
   draw();
   requestAnimationFrame(frame);
 }
@@ -208,6 +277,10 @@ function clearInput() {
   touches.clear();
 }
 
+window.addEventListener("pointermove", event => {
+  if (event.pointerType !== "touch") pointer = { x: event.clientX, y: event.clientY };
+});
+canvas.addEventListener("pointerdown", fire);
 action.addEventListener("click", startRound);
 window.addEventListener("keydown", event => {
   const key = event.key.toLowerCase();

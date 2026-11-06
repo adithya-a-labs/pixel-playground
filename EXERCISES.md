@@ -17,4 +17,4 @@ Open the full game and play one round. Then open `starter/index.html` and show t
 
 ## Two-minute playtest
 
-Try both key layouts. Hold two directions to test diagonals. Move into each wall and confirm you stay inside the arena. Collect an item and check the score. In the full game, collect five items and check that the level increases and another drone appears. Hit a drone, restart, and check the score and level reset. Narrow the window and check the controls stay visible.
+Try both key layouts. Hold two directions to test diagonals. Move into each wall and confirm you stay inside the arena. Collect an item and check the score. In the full game, check that another drone spawns after three seconds even if you collect nothing. Collect five items and check that the level increases. Shoot two drones in a row and check that the Gun countdown starts at five seconds. Hit a drone, restart, and check the score and level reset. Narrow the window and check the controls stay visible.

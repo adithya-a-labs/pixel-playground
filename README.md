@@ -2,14 +2,15 @@
 
 **CTRL + PLAY · AI Game Development Workshop · NIT Calicut**
 
-Collect sparks, dodge moving drones, and beat your best score. Every five sparks adds a level. Drone speed and count rise up to the limits in `RULES`.
+Collect sparks, dodge moving drones, and beat your best score. Every five sparks adds a level. Four drones start each round. Another spawns every three seconds, up to twelve active drones. Drone speed rises with level.
 
 ## Play locally
 
 1. Extract the ZIP. Keep its folders together.
 2. Double-click `index.html` to open it in a browser.
 3. Select **Start game**. Move with **WASD** or the **arrow keys**. On a touch screen, hold the direction buttons under the arena.
-4. If you hit a drone, choose **Play again**. Each new round resets the score and level. The best score is saved where the browser permits local storage.
+4. Aim with the mouse and click the arena to shoot drones. Collecting a spark or destroying two drones in a row locks the gun for five seconds. A shot that leaves the arena without hitting a drone breaks the streak. Watch the Gun countdown above the arena.
+5. If you hit a drone, choose **Play again**. Each new round resets the score and level. The best score is saved where the browser permits local storage.
 
 The game runs offline. You only need a browser and a text editor. After editing a file, save it and refresh the browser.
 
